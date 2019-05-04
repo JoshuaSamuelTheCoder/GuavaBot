@@ -58,15 +58,15 @@ def run_naive_dijk(client):
     find_bots_naive(client)
     botLocations = client.bot_locations
 
-    pathsHome = {}
+    pathsHome = {} # dictionary of form {node with bot: (path home, distance home)}
 
-    for botNode in botLocations:
+    for botNode in botLocations: # find path from each node to home, add to pathsHome
         pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
         nx.dijkstra_path_length(client.G, botNode, client.home))
 
     print(pathsHome)
 
-    for startNode in botLocations:
+    for startNode in botLocations: # find potential shorter paths between nodes with bots
         for midNode in pathsHome:
             if (startNode != midNode):
                 newPathLength = nx.dijkstra_path_length(client.G, startNode, midNode)
