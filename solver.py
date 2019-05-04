@@ -24,11 +24,15 @@ def run_naive_MST(client):
     		if (postorder_list[v], postorder_list[v_e]) in MST_tree.edges():
     			client.remote(postorder_list[v],postorder_list[v_e])
 
-# This one is 4b on design doc
-def run_naive_dijk(client):
 
-    seenNodes = dict((node, False) for node in client.G.nodes) # dictionary with (int node, boolean) pairs
-    botsAtNode = dict((node, -1) for node in client.G.nodes) # number of bots at each node (-1 for unseen nodes)
+def find_bots_naive(client):
+    """Helper for run_naive_dijk. Iterate through all edges, shortest -> longest,
+        remoting across each edge twice.
+
+        botsAtNode redundant bc client.bot_locations and client.bot_count.
+    """
+    seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
+    botsAtNode = {node: -1 for node in client.G.nodes} # number of bots at each node (-1 for unseen nodes)
     edge_list = []
 
     for (vert1, vert2, weight) in client.G.edges.data('weight',default=1): # get triples of the form (int first vertex, int second vertex, int edge weight)
@@ -45,6 +49,28 @@ def run_naive_dijk(client):
             botsAtNode[vert1] = client.remote(vert2, vert1)
             botsAtNode[vert2] = 0
 
-    for key in botsAtNode: # print all vertices with bots
-        if botsAtNode[key] > 0:
-            print(key,botsAtNode[key])
+    return botsAtNode
+
+
+# This one is 4b on design doc
+def run_naive_dijk(client):
+
+    find_bots_naive(client)
+    botLocations = client.bot_locations
+
+    pathsHome = {}
+
+    for botNode in botLocations:
+        pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home), nx.dijkstra_path_length(client.G, botNode, client.home))
+
+    for i in range(len(botLocations)):
+        startNode = botLocations[i]
+        myPaths = {}
+
+        for j in range(len(botLocations)):
+            if (i != j):
+                endNode = botLocations[j]
+                myPaths[endNode] = (nx.dijkstra_path(client.G, startNode, endNode),
+                    nx.dijkstra_path_length(client.G, startNode, endNode))
+
+        print(myPaths)
