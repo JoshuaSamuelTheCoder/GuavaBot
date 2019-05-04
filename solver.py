@@ -54,16 +54,23 @@ def ram_method(client):
     studentTruths = {s: 0 for s in range(1, client.students + 1)} #How many truths a student has said after verifying with remote
     studentLies = {s: 0 for s in range(1, client.students + 1)} #How many lies a student has said after verifying with remote
     studentOpinions = {node: list() for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
+    student_truth_teller = None; # This is the student who we will always believe if we know he must be correct.
 
     seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
     edge_list = []
-    all_students = list(range(1, client.students + 1))
+    all_students = list(range(1, client.students + 1)) #A list of numbers indicating the students
+    node_distance_to_home = {node: nx.dijkstra_path_length(client.G, node, client.home) for node in client.G.nodes if node != client.home} # Finds the distance of all nodes to home
+    home_and_nodes_with_bots = [client.home] #These are all nodes that we would run dijkstra's to
+    spt_nodes = {client.home} # States whether the current node is in the spt
 
-    # NAIVE: TO BE CHANGED -- Scouts all vertices and updates stuentOppinions to hold all of their opinions.
+    total_bots_found = 0
+
+    # NAIVE: TO BE CHANGED SINCE COULD BE WASTEFUL TO SCOUT ALL VERTICES -- Scouts all vertices and updates stuentOpinions to hold all of their opinions.
     for node in client.G.nodes:
-        opinions_for_node = client.scout(node, all_students) #Returns a dictionary of student : opinion
-        if opinions_for_node == None: #This means it is home
+        if node == client.home:
             continue
+        opinions_for_node = client.scout(node, all_students) #Returns a dictionary of student : opinion
+        # MAYBE TO BE CHANGED IF THIS DOES COST ANYTHING
 
         #Move all opinions to the studentOpinions dictionary
         for s in all_students:
@@ -75,19 +82,31 @@ def ram_method(client):
     #        have a short edge connected to them, and have a high probability of containing a bot
     # Second: We must make choices at every iteration whether to keep on building up our SPT or to start remoting bots home along the SPT.
     # We switch to the second stage when the number of bots <= number of vertices in SPT
+    # Note to self: We found distance to only closer nodes with bots. Would it be better or worse if we used distance to nodes in SPT
 
     #Implementing the first stage:
+    while (client.bots - total_bots_found > len(spt_nodes)):
+        for node in client.G.nodes:
+            #You only want to remote using vertices outside of SPT
+            if node in spt_nodes:
+                continue
 
+
+
+
+    home_and_nodes_with_bots = [client.home] + client.bot_locations
 
     print(studentOpinions)
+    print(home_and_nodes_with_bots)
 
 #NOTE: CHECK IF MY BOUNDS ARE CORRECT
-def update_student_weights(client, studentWeights, studentTruths, studentLies):
+def update_student_weights(client, studentWeights, studentTruths, studentLies, student_truth_teller):
     for student in studentWeights.keyList():
         if (studentLies.get(student) >= client.vertices / 2):
             studentWeights.update({student: 10000}) #this man is the truth teller
-        elif studentTruths.get(student) > client.vertices / 2:
-            studentWeights.update({student: 0}) #Everything else this man says can be a truth or a lie.
+            student_truth_teller = student
+        #elif studentTruths.get(student) > client.vertices / 2:
+        #    studentWeights.update({student: 0}) #Everything else this man says can be a truth or a lie, therefore we know he is not useful
         else:
             #Weights students in a way such that the more lies a student has told, the more trustworthy his opinion
             studentWeights.update({student: studentLies.get(student) / (studentTruths.get(student) + studentLies.get(student))})
