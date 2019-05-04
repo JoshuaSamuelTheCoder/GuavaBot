@@ -24,11 +24,14 @@ def run_naive_MST(client):
     		if (postorder_list[v], postorder_list[v_e]) in MST_tree.edges():
     			client.remote(postorder_list[v],postorder_list[v_e])
 
-# This one is 4b on design doc
-def run_naive_dijk(client):
 
-    seenNodes = dict((node, False) for node in client.G.nodes) # dictionary with (int node, boolean) pairs
-    botsAtNode = dict((node, -1) for node in client.G.nodes) # number of bots at each node (-1 for unseen nodes)
+def find_bots_naive(client):
+    """Helper for run_naive_dijk. Iterate through all edges, shortest -> longest,
+        remoting across each edge twice.
+        botsAtNode redundant bc client.bot_locations and client.bot_count.
+    """
+    seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
+    botsAtNode = {node: -1 for node in client.G.nodes} # number of bots at each node (-1 for unseen nodes)
     edge_list = []
 
     for (vert1, vert2, weight) in client.G.edges.data('weight',default=1): # get triples of the form (int first vertex, int second vertex, int edge weight)
@@ -45,9 +48,59 @@ def run_naive_dijk(client):
             botsAtNode[vert1] = client.remote(vert2, vert1)
             botsAtNode[vert2] = 0
 
-    for key in botsAtNode: # print all vertices with bots
-        if botsAtNode[key] > 0:
-            print(key,botsAtNode[key])
+    return botsAtNode
+
+
+# This one is 4b on design doc
+def run_naive_dijk(client):
+
+    find_bots_naive(client)
+    botLocations = client.bot_locations
+
+    pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
+
+    for botNode in botLocations: # find path from each node to home, add to pathsHome
+        pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
+        nx.dijkstra_path_length(client.G, botNode, client.home))
+
+    print(pathsHome)
+
+    for startNode in botLocations: # find potential shorter paths between nodes with bots
+        for midNode in pathsHome:
+            if (startNode != midNode):
+                newPathLength = nx.dijkstra_path_length(client.G, startNode, midNode)
+
+                # if startNode->endNode->home shorter than startNode->home, update pathsHome[startNode] = (just startNode->endNode path, dist(startNode->endNode->home))
+                if (pathsHome[startNode][1] > newPathLength + pathsHome[midNode][1]):
+                    pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength + pathsHome[midNode[1]])
+
+    # construct shortestPathsTree from pathsHome
+    shortestPathsTree = nx.Graph()
+
+    # add each node from pathsHome paths
+    for node in pathsHome:
+        myPath = pathsHome[node][0]
+        for myNode in myPath:
+            shortestPathsTree.add_node(myNode)
+
+    # add each edge from pathsHome paths
+    for node in pathsHome:
+        myPath = pathsHome[node][0]
+        for i in range(len(myPath) - 1):
+            shortestPathsTree.add_edge(myPath[i], myPath[i+1])
+
+    # postorder SPT to remote bots home
+    postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
+
+    # remote bots home
+    for v in range(len(postorder_SPT) - 1):
+    	for v_e in range(v + 1, len(postorder_SPT)):
+    		if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
+    			client.remote(postorder_SPT[v],postorder_SPT[v_e])
+
+    print(pathsHome)
+    print(postorder_SPT)
+
 
 def ram_method(client):
     studentWeights = {s: 1 for s in range(1, client.students + 1)} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
@@ -70,8 +123,8 @@ def ram_method(client):
         if node == client.home:
             continue
         opinions_for_node = client.scout(node, all_students) #Returns a dictionary of student : opinion
-        # MAYBE TO BE CHANGED IF THIS DOES COST ANYTHING
 
+        # TO BE CHANGED: The list index is one off of the student number since the student "1"'s opinion will be 0th in the list etc.
         #Move all opinions to the studentOpinions dictionary
         for s in all_students:
             curr_opinions = studentOpinions.get(node)
@@ -82,6 +135,7 @@ def ram_method(client):
     #        have a short edge connected to them, and have a high probability of containing a bot
     # Second: We must make choices at every iteration whether to keep on building up our SPT or to start remoting bots home along the SPT.
     # We switch to the second stage when the number of bots <= number of vertices in SPT
+
     # Note to self: We found distance to only closer nodes with bots. Would it be better or worse if we used distance to nodes in SPT
 
     #Implementing the first stage:
@@ -90,6 +144,8 @@ def ram_method(client):
             #You only want to remote using vertices outside of SPT
             if node in spt_nodes:
                 continue
+
+
 
 
 
