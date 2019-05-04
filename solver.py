@@ -58,7 +58,7 @@ def run_naive_dijk(client):
     find_bots_naive(client)
     botLocations = client.bot_locations
 
-    pathsHome = {} # dictionary of form {node with bot: (path home, distance home)}
+    pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
 
     for botNode in botLocations: # find path from each node to home, add to pathsHome
         pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
@@ -70,7 +70,34 @@ def run_naive_dijk(client):
         for midNode in pathsHome:
             if (startNode != midNode):
                 newPathLength = nx.dijkstra_path_length(client.G, startNode, midNode)
-                if (pathsHome[startNode][1] > pathsHome[midNode][1] + newPathLength):
-                    pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength)
+
+                # if startNode->endNode->home shorter than startNode->home, update pathsHome[startNode] = (just startNode->endNode path, dist(startNode->endNode->home))
+                if (pathsHome[startNode][1] > newPathLength + pathsHome[midNode][1]):
+                    pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength + pathsHome[midNode[1]])
+
+    # construct shortestPathsTree from pathsHome
+    shortestPathsTree = nx.Graph()
+
+    # add each node from pathsHome paths
+    for node in pathsHome:
+        myPath = pathsHome[node][0]
+        for myNode in myPath:
+            shortestPathsTree.add_node(myNode)
+
+    # add each edge from pathsHome paths
+    for node in pathsHome:
+        myPath = pathsHome[node][0]
+        for i in range(len(myPath) - 1):
+            shortestPathsTree.add_edge(myPath[i], myPath[i+1])
+
+    # postorder SPT to remote bots home
+    postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
+
+    # remote bots home
+    for v in range(len(postorder_SPT) - 1):
+    	for v_e in range(v + 1, len(postorder_SPT)):
+    		if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
+    			client.remote(postorder_SPT[v],postorder_SPT[v_e])
 
     print(pathsHome)
+    print(postorder_SPT)
