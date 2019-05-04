@@ -61,16 +61,16 @@ def run_naive_dijk(client):
     pathsHome = {}
 
     for botNode in botLocations:
-        pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home), nx.dijkstra_path_length(client.G, botNode, client.home))
+        pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
+        nx.dijkstra_path_length(client.G, botNode, client.home))
 
-    for i in range(len(botLocations)):
-        startNode = botLocations[i]
-        myPaths = {}
+    print(pathsHome)
 
-        for j in range(len(botLocations)):
-            if (i != j):
-                endNode = botLocations[j]
-                myPaths[endNode] = (nx.dijkstra_path(client.G, startNode, endNode),
-                    nx.dijkstra_path_length(client.G, startNode, endNode))
+    for startNode in botLocations:
+        for midNode in pathsHome:
+            if (startNode != midNode):
+                newPathLength = nx.dijkstra_path_length(client.G, startNode, midNode)
+                if (pathsHome[startNode][1] > pathsHome[midNode][1] + newPathLength):
+                    pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength)
 
-        print(myPaths)
+    print(pathsHome)
