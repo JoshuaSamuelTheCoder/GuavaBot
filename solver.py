@@ -204,7 +204,7 @@ def ram_method(client):
         home_and_nodes_with_bots = [client.home] + client.bot_locations
         home_and_nodes_with_bots.sort(key = lambda x : node_distance_to_home.get(x))
 
-        """
+
         botLocations = client.bot_locations
 
         pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
@@ -215,6 +215,7 @@ def ram_method(client):
 
         print(pathsHome)
 
+        """
         for startNode in botLocations: # find potential shorter paths between nodes with bots
             for midNode in pathsHome:
                 if (startNode != midNode):
@@ -223,6 +224,7 @@ def ram_method(client):
                     # if startNode->endNode->home shorter than startNode->home, update pathsHome[startNode] = (just startNode->endNode path, dist(startNode->endNode->home))
                     if (pathsHome[startNode][1] > newPathLength + pathsHome[midNode][1]):
                         pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength + pathsHome[midNode[1]])
+        """
 
         # construct shortestPathsTree from pathsHome
         shortestPathsTree = nx.Graph()
@@ -239,7 +241,9 @@ def ram_method(client):
             for i in range(len(myPath) - 1):
                 shortestPathsTree.add_edge(myPath[i], myPath[i+1])
 
-        spt_nodes = {spt_node for spt_node in shortestPathsTree.nodes}
+        print("Nodes", shortestPathsTree.nodes)
+
+        spt_nodes = set(shortestPathsTree.nodes)
 
         """
         for source in home_and_nodes_with_bots:
@@ -256,8 +260,6 @@ def ram_method(client):
         print(spt_nodes)
 
     # postorder SPT to remote bots home
-    """
-    """
     postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
 
     # remote bots home
@@ -265,7 +267,6 @@ def ram_method(client):
         for v_e in range(v + 1, len(postorder_SPT)):
             if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
                 client.remote(postorder_SPT[v],postorder_SPT[v_e])
-    """
     #This is the second part of the algorithm
 
 
@@ -290,7 +291,7 @@ def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to
     total_hueristic *= len(nodes_to_spt)
     total_hueristic /= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 50.0)
     return total_hueristic
-    
+
 
 def find_bots_scout(client):
 
