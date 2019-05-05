@@ -7,10 +7,9 @@ def solve(client):
     client.end()
     client.start()
 
-    #if (client.v == client.bots):
-    #    run_naive_MST(client)
-
     ram_method(client)
+
+    # run_naive_dijk(client)
 
     """
     if (client.k > 20):
@@ -63,26 +62,90 @@ def find_bots_naive(client):
 
 # This one is 4b on design doc
 def run_naive_dijk(client):
-
     find_bots_naive(client)
     botLocations = client.bot_locations
 
     pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
+    spt_nodes = []
+    spt_edges = []
 
     for botNode in botLocations: # find path from each node to home, add to pathsHome
         pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
         nx.dijkstra_path_length(client.G, botNode, client.home))
 
-    print(pathsHome)
 
-    for startNode in botLocations: # find potential shorter paths between nodes with bots
-        for midNode in pathsHome:
-            if (startNode != midNode):
-                newPathLength = nx.dijkstra_path_length(client.G, startNode, midNode)
+    print("pathsHome:", pathsHome)
 
-                # if startNode->endNode->home shorter than startNode->home, update pathsHome[startNode] = (just startNode->endNode path, dist(startNode->endNode->home))
-                if (pathsHome[startNode][1] > newPathLength + pathsHome[midNode][1]):
-                    pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength + pathsHome[midNode[1]])
+    sorted_startNodes = sorted(pathsHome, key=lambda k: pathsHome[k][1]) # sort pathsHome by distance from each bot node to home
+    print("sorted_startNodes:", sorted_startNodes)
+
+    closestbotNode = sorted_startNodes[0] # bot node with shortest path to home
+
+    for node in pathsHome[closestbotNode][0]: # add into SPT all nodes from closestbotNode->home
+        spt_nodes.append(node)
+
+    for i in range(len(pathsHome[closestbotNode][0]) - 1): # add into SPT all edges from closestbotNode->home
+        spt_edges.append((pathsHome[closestbotNode][0][i], pathsHome[closestbotNode][0][i + 1]))
+
+    print("spt_nodes initial:", spt_nodes)
+    print("spt_edges initial:",spt_edges)
+
+    for i in range(1, len(sorted_startNodes)): # for each remaining bot node
+        startNode = sorted_startNodes[i]
+        pathsToSPT = {}
+
+        pathsToSPT[client.home] = (nx.dijkstra_path(client.G, startNode, client.home), nx.dijkstra_path_length(client.G, startNode, client.home))
+        for spt_node in spt_nodes: # compute (path, path length) from bot node to spt_node
+            pathsToSPT[spt_node] = (nx.dijkstra_path(client.G, startNode, spt_node), nx.dijkstra_path_length(client.G, startNode, spt_node))
+
+        sorted_pathsToSPT = sorted(pathsToSPT, key=lambda k: pathsToSPT[k][1])
+        print("pathsToSPT:", pathsToSPT)
+        print("sorted_pathsToSPT:", sorted_pathsToSPT)
+
+        closest_spt_node = sorted_pathsToSPT[0] # closest node in SPT
+
+        # add path to spt_nodes and spt_edges
+        pathToSPT = pathsToSPT[closest_spt_node][0]
+        for node in pathToSPT:
+            spt_nodes.append(node)
+        for i in range(len(pathToSPT) - 1):
+            spt_edges.append((pathToSPT[i], pathToSPT[i + 1]))
+
+        print("spt_nodes:", spt_nodes)
+        print("spt_edges:", spt_edges)
+
+    #build shortestPathsTree from spt_nodes and spt_edges
+    shortestPathsTree = nx.Graph()
+    for spt_node in spt_nodes:
+        shortestPathsTree.add_node(spt_node)
+    for spt_edge in spt_edges:
+        shortestPathsTree.add_edge(spt_edge[0], spt_edge[1])
+
+    # postorder SPT to remote bots home
+    postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
+
+    # remote bots home
+    for v in range(len(postorder_SPT) - 1):
+    	for v_e in range(v + 1, len(postorder_SPT)):
+    		if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
+    			client.remote(postorder_SPT[v],postorder_SPT[v_e])
+
+
+
+
+    """# add each edge from closest node in sorted_paths
+    myPath = sorted_startNodes[0][0]
+    for i in range(len(myPath) - 1):
+        spt_nodes.append(myPath[i], myPath[i+1])
+
+    print(spt_nodes)
+
+
+
+    for i in range(1, len(sorted_startNodes)):
+        myNode = sorted_startNodes[1]
+
+
 
     # construct shortestPathsTree from pathsHome
     shortestPathsTree = nx.Graph()
@@ -107,9 +170,7 @@ def run_naive_dijk(client):
     	for v_e in range(v + 1, len(postorder_SPT)):
     		if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
     			client.remote(postorder_SPT[v],postorder_SPT[v_e])
-
-    print(pathsHome)
-    print(postorder_SPT)
+"""
 
 
 def ram_method(client):
@@ -211,15 +272,18 @@ def ram_method(client):
         home_and_nodes_with_bots = [client.home] + client.bot_locations
         home_and_nodes_with_bots.sort(key = lambda x : node_distance_to_home.get(x))
 
+        
         #botLocations is hacky because brian is an idiot and now includes home
         botLocations = client.bot_locations
         botLocations = botLocations + [client.home]
+        print("botLocations:", botLocations)
 
         pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
 
         for botNode in botLocations: # find path from each node to home, add to pathsHome
             pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
             nx.dijkstra_path_length(client.G, botNode, client.home))
+
 
         """
         for startNode in botLocations: # find potential shorter paths between nodes with bots
@@ -231,6 +295,7 @@ def ram_method(client):
                     if (pathsHome[startNode][1] > newPathLength + pathsHome[midNode][1]):
                         pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength + pathsHome[midNode[1]])
         """
+
 
         # construct shortestPathsTree from pathsHome
         shortestPathsTree = nx.Graph()
@@ -248,6 +313,7 @@ def ram_method(client):
                 shortestPathsTree.add_edge(myPath[i], myPath[i+1])
 
         spt_nodes = set(shortestPathsTree.nodes)
+
 
         """
         for source in home_and_nodes_with_bots:
@@ -270,6 +336,7 @@ def ram_method(client):
         for v_e in range(v + 1, len(postorder_SPT)):
             if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
                 client.remote(postorder_SPT[v],postorder_SPT[v_e])
+
     #This is the second part of the algorithm
 
 
@@ -319,7 +386,7 @@ def find_bots_scout(client):
                 client.remote(vertex1, vertex2)
 
 
-    all_students = list(range(1, client.students + 1))
+    """all_students = list(range(1, client.students + 1))
 
 
     scoreAtNode = {node: 0 for node in client.G.nodes}
@@ -333,7 +400,7 @@ def find_bots_scout(client):
 
     sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
 
-    print(sorted_scoreAtNode)
+    print(sorted_scoreAtNode)"""
 
 
 	#pathsHome = {}
