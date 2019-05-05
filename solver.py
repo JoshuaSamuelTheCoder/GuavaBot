@@ -150,7 +150,7 @@ def ram_method(client):
     #Implementing the first stage:
     remoted_nodes_first_stage = set() # Set of remoted nodes
     shortestPathsTree = None
-    while(len(spt_nodes) < client.bots):
+    while(len([node for node in client.G.nodes if node not in spt_node and node not in remoted_nodes_first_stage]) < client.bots):
     #while (client.bots - total_bots_found > len(spt_nodes)):
         #if student_truth_teller != null:
         #   run_spt()
@@ -315,21 +315,28 @@ def find_bots_scout(client):
                 client.remote(vertex1, vertex2)
 
 
-	all_students = list(range(1, client.students + 1))
+    all_students = list(range(1, client.students + 1))
 
 
-	scoreAtNode = {node: 0 for node in client.G.nodes}
-	non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
-	dic = {}
-	for v in non_home:
-		dic = client.scout(v, all_students)
-		for j in dic.values():
-			if(j == True):
-				scoreAtNode[v] += 1
+    scoreAtNode = {node: 0 for node in client.G.nodes}
+    non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
+    dic = {}
+    for v in non_home:
+    	dic = client.scout(v, all_students)
+    	for j in dic.values():
+    		if(j == True):
+    			scoreAtNode[v] += 1
 
-	sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
+    sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
 
-	print(sorted_scoreAtNode)
+    print(sorted_scoreAtNode)
+
+
+	#pathsHome = {}
+
+	#for botNode in sorted_scoreAtNode:
+	#	pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
+    #   nx.dijkstra_path_length(client.G, botNode, client.home))
 
 
 	#pathsHome = {}
