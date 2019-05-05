@@ -10,13 +10,15 @@ def solve(client):
     #if (client.v == client.bots):
     #    run_naive_MST(client)
 
-    # ram_method(client)
+    ram_method(client)
 
+    """
     if (client.k > 20):
         run_naive_MST(client)
     else:
         find_bots_scout(client)
     print(client.k)
+    """
 
 
     client.end()
@@ -150,7 +152,7 @@ def ram_method(client):
     #Implementing the first stage:
     remoted_nodes_first_stage = set() # Set of remoted nodes
     shortestPathsTree = None
-    while(len([node for node in client.G.nodes if node not in spt_node and node not in remoted_nodes_first_stage]) < client.bots):
+    while(len(spt_nodes) + len(remoted_nodes_first_stage) < len(client.G.nodes)):
     #while (client.bots - total_bots_found > len(spt_nodes)):
         #if student_truth_teller != null:
         #   run_spt()
