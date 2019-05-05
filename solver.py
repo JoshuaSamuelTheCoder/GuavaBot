@@ -290,3 +290,30 @@ def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to
     total_hueristic *= len(nodes_to_spt)
     total_hueristic /= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 50.0)
     return total_hueristic
+    
+
+def find_bots_scout(client):
+
+
+	all_students = list(range(1, client.students + 1))
+
+
+	scoreAtNode = {node: 0 for node in client.G.nodes}
+	non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
+	dic = {}
+	for v in non_home:
+		dic = client.scout(v, all_students)
+		for j in dic.values():
+			if(j == True):
+				scoreAtNode[v] += 1
+
+	sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
+
+	print(sorted_scoreAtNode)
+
+
+	#pathsHome = {}
+
+	#for botNode in sorted_scoreAtNode:
+	#	pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
+    #   nx.dijkstra_path_length(client.G, botNode, client.home))
