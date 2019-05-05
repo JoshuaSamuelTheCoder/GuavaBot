@@ -1,5 +1,6 @@
 import networkx as nx
 import random
+import operator
 
 def solve(client):
     client.end()
@@ -8,7 +9,13 @@ def solve(client):
     #if (client.v == client.bots):
     #    run_naive_MST(client)
 
-    ram_method(client)
+    # ram_method(client)
+
+    if (client.k > 20):
+        run_naive_MST(client)
+    else:
+        find_bots_scout(client)
+    print(client.k)
 
 
     client.end()
@@ -22,7 +29,7 @@ def run_naive_MST(client):
     for v in range(len(postorder_list) - 1):
     	for v_e in range(v + 1, len(postorder_list)):
     		if (postorder_list[v], postorder_list[v_e]) in MST_tree.edges():
-    			client.remote(postorder_list[v],postorder_list[v_e])
+    			client.remote(postorder_list[v], postorder_list[v_e])
 
 
 def find_bots_naive(client):
@@ -170,26 +177,23 @@ def update_student_weights(client, studentWeights, studentTruths, studentLies, s
 
 def find_bots_scout(client):
 
+    all_students = list(range(1, client.students + 1))
 
-	all_students = list(range(1, client.students + 1))
+    scoreAtNode = {node: 0 for node in client.G.nodes}
+    non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
+    studentVotes = {}
+    for v in non_home:
+        studentVotes = client.scout(v, all_students)
+        for j in studentVotes.values():
+            if(j == True):
+                scoreAtNode[v] += 1
+    sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
 
-
-	scoreAtNode = {node: 0 for node in client.G.nodes}
-	non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
-	dic = {}
-	for v in non_home:
-		dic = client.scout(v, all_students)
-		for j in dic.values():
-			if(j == True):
-				scoreAtNode[v] += 1
-
-	sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
-
-	print(sorted_scoreAtNode)
-
-
-	#pathsHome = {}
-
-	#for botNode in sorted_scoreAtNode:
-	#	pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
-    #   nx.dijkstra_path_length(client.G, botNode, client.home))
+    for nodeScore in sorted_scoreAtNode:
+        myNode = nodeScore[0]
+        pathHome = nx.dijkstra_path(client.G, myNode, client.home)
+        for i in range(len(pathHome) - 1):
+            if (client.bot_count[client.home] != client.l):
+                vertex1 = pathHome[i]
+                vertex2 = pathHome[i + 1]
+                client.remote(vertex1, vertex2)
