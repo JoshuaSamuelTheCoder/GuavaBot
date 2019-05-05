@@ -143,7 +143,7 @@ def ram_method(client):
     #Implementing the first stage:
     remoted_nodes_first_stage = set() # Set of remoted nodes
     shortestPathsTree = None
-    while(len(spt_nodes) + len(remoted_nodes_first_stage) < client.bots):
+    while(len(spt_nodes) < client.bots):
     #while (client.bots - total_bots_found > len(spt_nodes)):
         #if student_truth_teller != null:
         #   run_spt()
