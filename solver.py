@@ -163,7 +163,6 @@ def ram_method(client):
             for spt_node in spt_nodes:
                 distance_to_spt_node = nx.dijkstra_path_length(client.G, node, spt_node)
                 nodes_on_path_to_spt_node = nx.dijkstra_path(client.G, node, spt_node)
-                print(nodes_on_path_to_spt_node)
                 if (distance_to_spt_node <= shortest_path_to_spt):
                     # Only update the path if it is either shorter or if it is equal and contains more nodes
                     if (distance_to_spt_node < shortest_path_to_spt or len(nodes_on_path_to_spt_node) > len(best_path_nodes_to_spt)):
@@ -171,9 +170,6 @@ def ram_method(client):
                         best_path_nodes_to_spt = nodes_on_path_to_spt_node # List of nodes on the path
 
             #Find the hueristic value for the current node
-            print(node)
-            print(best_path_nodes_to_spt)
-            print(spt_node)
             hueristic_for_node = find_hueristic_value(client, node, studentOpinions, studentWeights, best_path_nodes_to_spt)
 
             # TO BE CHANGED -- Maybe we can improve this, right now am just only updating the best node if it has at least the same hueristic, not handling ties well
@@ -204,16 +200,15 @@ def ram_method(client):
         home_and_nodes_with_bots = [client.home] + client.bot_locations
         home_and_nodes_with_bots.sort(key = lambda x : node_distance_to_home.get(x))
 
-
+        #botLocations is hacky because brian is an idiot and now includes home
         botLocations = client.bot_locations
+        botLocations = botLocations + [client.home]
 
         pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
 
         for botNode in botLocations: # find path from each node to home, add to pathsHome
             pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
             nx.dijkstra_path_length(client.G, botNode, client.home))
-
-        print(pathsHome)
 
         """
         for startNode in botLocations: # find potential shorter paths between nodes with bots
@@ -241,8 +236,6 @@ def ram_method(client):
             for i in range(len(myPath) - 1):
                 shortestPathsTree.add_edge(myPath[i], myPath[i+1])
 
-        print("Nodes", shortestPathsTree.nodes)
-
         spt_nodes = set(shortestPathsTree.nodes)
 
         """
@@ -257,7 +250,6 @@ def ram_method(client):
             for node in nx.dijkstra_path(client.G, source, best_target):
                     spt_nodes.add(node)
         """
-        print(spt_nodes)
 
     # postorder SPT to remote bots home
     postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
