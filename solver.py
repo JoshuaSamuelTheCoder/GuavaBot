@@ -113,7 +113,7 @@ def run_naive_dijk(client):
 
 
 def ram_method(client):
-    studentWeights = {s: 1.0 for s in range(1, client.students + 1)} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
+    studentWeights = {s: 2.0 for s in range(1, client.students + 1)} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
     studentTruths = {s: 0 for s in range(1, client.students + 1)} #How many truths a student has said after verifying with remote
     studentLies = {s: 0 for s in range(1, client.students + 1)} #How many lies a student has said after verifying with remote
     studentOpinions = {node: list() for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
@@ -197,6 +197,8 @@ def ram_method(client):
         #Update whether the student told the truth or not
         for student in studentTruths:
             # Wow this is gross but it's because the first student is 0 indexed etc.
+            if studentOpinions.get(node) == node:
+                break
             if (num_bots_remoted >= 1 and studentOpinions.get(node)[student - 1]) or (num_bots_remoted == 0 and not studentOpinions.get(node)[student - 1]):
                 studentTruths.update({student: studentTruths.get(student) + 1})
             else:
@@ -281,7 +283,7 @@ def update_student_weights(client, studentWeights, studentTruths, studentLies, s
         #    studentWeights.update({student: 0}) #Everything else this man says can be a truth or a lie, therefore we know he is not useful
         else:
             #Weights students in a way such that the more lies a student has told, the more trustworthy his opinion
-            studentWeights.update({student: 1 + 0.5 * studentLies.get(student) / (studentTruths.get(student) + studentLies.get(student))})
+            studentWeights.update({student: 2.0 + 0.5 * studentLies.get(student) / (studentTruths.get(student) + studentLies.get(student))})
 
 def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to_spt):
     total_hueristic = 0
@@ -289,8 +291,8 @@ def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to
         if studentOpinions.get(student):
             total_hueristic += studentWeights.get(student)
 
-    total_hueristic *= len(nodes_to_spt)
-    total_hueristic /= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 50.0)
+    total_hueristic *= len(nodes_to_spt) * 0.25
+    total_hueristic /= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 100.0)
     return total_hueristic
 
 
