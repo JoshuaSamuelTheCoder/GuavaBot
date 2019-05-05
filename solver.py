@@ -166,3 +166,30 @@ def update_student_weights(client, studentWeights, studentTruths, studentLies, s
         else:
             #Weights students in a way such that the more lies a student has told, the more trustworthy his opinion
             studentWeights.update({student: studentLies.get(student) / (studentTruths.get(student) + studentLies.get(student))})
+
+
+def find_bots_scout(client):
+
+
+	all_students = list(range(1, client.students + 1))
+
+
+	scoreAtNode = {node: 0 for node in client.G.nodes}
+	non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
+	dic = {}
+	for v in non_home:
+		dic = client.scout(v, all_students)
+		for j in dic.values():
+			if(j == True):
+				scoreAtNode[v] += 1
+
+	sorted_scoreAtNode = sorted(scoreAtNode.items(), key=operator.itemgetter(1))[::-1]
+
+	print(sorted_scoreAtNode)
+
+
+	#pathsHome = {}
+
+	#for botNode in sorted_scoreAtNode:
+	#	pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
+    #   nx.dijkstra_path_length(client.G, botNode, client.home))
