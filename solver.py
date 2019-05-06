@@ -174,18 +174,21 @@ def run_naive_dijk(client):
 
 
 def ram_method(client):
-    studentWeights = {s: 2.0 for s in range(1, client.students + 1)} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
-    studentTruths = {s: 0 for s in range(1, client.students + 1)} #How many truths a student has said after verifying with remote
-    studentLies = {s: 0 for s in range(1, client.students + 1)} #How many lies a student has said after verifying with remote
-    studentOpinions = {node: list() for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
+    all_students = list(range(1, client.students + 1)) #A list of numbers indicating the students
+    # Limit sampling to 30 students
+    #if (len(all_students) > 30):
+    #    all_students = random.choices(all_students, k=30)
+    studentWeights = {s: 1.0 for s in all_students} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
+    studentTruths = {s: 0 for s in all_students} #How many truths a student has said after verifying with remote
+    studentLies = {s: 0 for s in all_students} #How many lies a student has said after verifying with remote
+    studentOpinions = {node: [0] for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
     student_truth_teller = None; # This is the student who we will always believe if we know he must be correct.
 
     seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
     edge_list = []
-    all_students = list(range(1, client.students + 1)) #A list of numbers indicating the students
     node_distance_to_home = {node: nx.dijkstra_path_length(client.G, node, client.home) for node in client.G.nodes} # Finds the distance of all nodes to home
     home_and_nodes_with_bots = [client.home] #These are all nodes that we would run dijkstra's to
-    spt_nodes = {client.home} # States whether the current node is in the spt
+    spt_nodes = [client.home] # States whether the current node is in the spt
 
     total_bots_found = 0
 
@@ -213,54 +216,27 @@ def ram_method(client):
     #Implementing the first stage:
     remoted_nodes_first_stage = set() # Set of remoted nodes
     shortestPathsTree = None
-    while(len(spt_nodes) + len(remoted_nodes_first_stage) < len(client.G.nodes)):
-    #while (client.bots - total_bots_found > len(spt_nodes)):
+    #while(len(spt_nodes) + len(remoted_nodes_first_stage) < len(client.G.nodes)):
+    while (client.bots - total_bots_found > len(spt_nodes)):
         #if student_truth_teller != null:
         #   run_spt()
-        best_node = None # We will choose the best node
-        neighbor_node = None # We will remote to this node, first node on way to SPT
-        best_hueristic_seen = 0 # Keep track of the best hueristic value seen
-
-        for node in client.G.nodes:
-            #You only want to remote using vertices outside of SPT
-            if node in spt_nodes or node in remoted_nodes_first_stage:
-                continue
-
-            # Find the shortest path to the SPT and the nodes along the path
-            shortest_path_to_spt = math.inf
-            best_path_nodes_to_spt = list()
-
-            for spt_node in spt_nodes:
-                distance_to_spt_node = nx.dijkstra_path_length(client.G, node, spt_node)
-                nodes_on_path_to_spt_node = nx.dijkstra_path(client.G, node, spt_node)
-                if (distance_to_spt_node <= shortest_path_to_spt):
-                    # Only update the path if it is either shorter or if it is equal and contains more nodes
-                    if (distance_to_spt_node < shortest_path_to_spt or len(nodes_on_path_to_spt_node) > len(best_path_nodes_to_spt)):
-                        shortest_path_to_spt = distance_to_spt_node
-                        best_path_nodes_to_spt = nodes_on_path_to_spt_node # List of nodes on the path
-
-            #Find the hueristic value for the current node
-            hueristic_for_node = find_hueristic_value(client, node, studentOpinions, studentWeights, best_path_nodes_to_spt)
-
-            # TO BE CHANGED -- Maybe we can improve this, right now am just only updating the best node if it has at least the same hueristic, not handling ties well
-            if hueristic_for_node >= best_hueristic_seen:
-                best_hueristic_seen = hueristic_for_node
-                best_node = node
-                neighbor_node = best_path_nodes_to_spt[1] #First node on the path
-
+        best_node, neighbor_node = find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, studentOpinions, studentWeights)
         # Get the number of bots remoted
+        #print("Nodes:", best_node, neighbor_node)
         num_bots_remoted = client.remote(best_node, neighbor_node)
         total_bots_found += num_bots_remoted
 
         # Don't ever remote from this node again (at least in this step)
         remoted_nodes_first_stage.add(best_node)
 
+        #print(studentOpinions.get(best_node))
         #Update whether the student told the truth or not
         for student in studentTruths:
             # Wow this is gross but it's because the first student is 0 indexed etc.
-            if studentOpinions.get(node) == node:
+            if studentOpinions.get(best_node) == None:
                 break
-            if (num_bots_remoted >= 1 and studentOpinions.get(node)[student - 1]) or (num_bots_remoted == 0 and not studentOpinions.get(node)[student - 1]):
+            #print(student)
+            if (num_bots_remoted >= 1 and studentOpinions.get(best_node)[student]) or (num_bots_remoted == 0 and not studentOpinions.get(best_node)[student]):
                 studentTruths.update({student: studentTruths.get(student) + 1})
             else:
                 studentLies.update({student: studentLies.get(student) + 1})
@@ -268,89 +244,176 @@ def ram_method(client):
         # Now update the student weights
         update_student_weights(client, studentWeights, studentTruths, studentLies, student_truth_teller)
 
-        # Update our list of nodes with bots and home, gonna sort by distance from home
-        home_and_nodes_with_bots = [client.home] + client.bot_locations
-        home_and_nodes_with_bots.sort(key = lambda x : node_distance_to_home.get(x))
-
-        
-        #botLocations is hacky because brian is an idiot and now includes home
+        #Brian's code
         botLocations = client.bot_locations
-        botLocations = botLocations + [client.home]
-        print("botLocations:", botLocations)
-
+        botLocations = botLocations + [client.home] #Have to add home because we suck
         pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
+        spt_nodes = []
+        spt_edges = []
 
-        for botNode in botLocations: # find path from each node to home, add to pathsHome
-            pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
-            nx.dijkstra_path_length(client.G, botNode, client.home))
-
-
-        """
-        for startNode in botLocations: # find potential shorter paths between nodes with bots
-            for midNode in pathsHome:
-                if (startNode != midNode):
-                    newPathLength = nx.dijkstra_path_length(client.G, startNode, midNode)
-
-                    # if startNode->endNode->home shorter than startNode->home, update pathsHome[startNode] = (just startNode->endNode path, dist(startNode->endNode->home))
-                    if (pathsHome[startNode][1] > newPathLength + pathsHome[midNode][1]):
-                        pathsHome[startNode] = (nx.dijkstra_path(client.G, startNode, midNode), newPathLength + pathsHome[midNode[1]])
-        """
-
-
-        # construct shortestPathsTree from pathsHome
-        shortestPathsTree = nx.Graph()
-
-        # add each node from pathsHome paths
-        for node in pathsHome:
-            myPath = pathsHome[node][0]
-            for myNode in myPath:
-                shortestPathsTree.add_node(myNode)
-
-        # add each edge from pathsHome paths
-        for node in pathsHome:
-            myPath = pathsHome[node][0]
-            for i in range(len(myPath) - 1):
-                shortestPathsTree.add_edge(myPath[i], myPath[i+1])
-
-        spt_nodes = set(shortestPathsTree.nodes)
-
-
-        """
-        for source in home_and_nodes_with_bots:
-            shortest_path_to_spt = math.inf
-            best_target = None
-            for target in spt_nodes:
-                if (nx.dijkstra_path_length(client.G, source, target) < shortest_path_to_spt):
-                    shortest_path_to_spt = nx.dijkstra_path_length(client.G, source, target)
-                    best_target = target
-            print("Path", nx.dijkstra_path(client.G, source, best_target))
-            for node in nx.dijkstra_path(client.G, source, best_target):
-                    spt_nodes.add(node)
-        """
-
-    # postorder SPT to remote bots home
-    postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
-
-    # remote bots home
-    for v in range(len(postorder_SPT) - 1):
-        for v_e in range(v + 1, len(postorder_SPT)):
-            if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
-                client.remote(postorder_SPT[v],postorder_SPT[v_e])
+        # Make Brian tree will fill in everything so passing in parameters to be filled
+        shortestPathsTree = make_brian_graph(client, pathsHome, spt_nodes, spt_edges, botLocations)
 
     #This is the second part of the algorithm
+
+    print("Second part!")
+    remoted_from_nodes = remoted_nodes_first_stage
+    # postorder SPT to remote bots home
+    # While you still have more bots to remote home keep remoting
+    while (client.bot_count[client.home] < client.bots):
+        if (not should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, client.bots - total_bots_found)):
+            best_node, neighbor_node = find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, studentOpinions, studentWeights)
+            # Get the number of bots remoted
+            #print("Best Node", best_node, neighbor_node)
+            num_bots_remoted = client.remote(best_node, neighbor_node)
+            total_bots_found += num_bots_remoted
+
+            # Don't ever remote from this node again (at least in this step)
+            remoted_from_nodes.add(best_node)
+
+            #Update whether the student told the truth or not
+            for student in studentTruths:
+                # Wow this is gross but it's because the first student is 0 indexed etc.
+                if studentOpinions.get(best_node) == None: #Maybe this is home and somehow it fell through the cracks.
+                    break
+                if (num_bots_remoted == 1 and studentOpinions.get(best_node)[student]) or (num_bots_remoted == 0 and not studentOpinions.get(best_node)[student]):
+                    studentTruths.update({student: studentTruths.get(student) + 1})
+                elif (num_bots_remoted > 1):
+                    print("ERROR!!!!!")
+                    print("ERROR!!!!!")
+                    print("ERROR!!!!!")
+                    print("ERROR!!!!!")
+                    print("ERROR!!!!!")
+                else:
+                    studentLies.update({student: studentLies.get(student) + 1})
+
+            # Now update the student weights
+            update_student_weights(client, studentWeights, studentTruths, studentLies, student_truth_teller)
+
+            #Brian's code
+            botLocations = client.bot_locations
+            botLocations = botLocations + [client.home] #Have to add home because we suck
+            pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
+            spt_nodes = []
+            spt_edges = []
+
+            # Make Brian tree will fill in everything so passing in parameters to be filled
+            shortestPathsTree = make_brian_graph(client, pathsHome, spt_nodes, spt_edges, botLocations)
+        else:
+            print("Moving SPT")
+            #Brian's code
+            botLocations = client.bot_locations
+            botLocations = botLocations + [client.home] #Have to add home because we suck
+            pathsHome = {} # dictionary of form {node with bot: (path home as list of vertices, distance home)}
+            spt_nodes = []
+            spt_edges = []
+
+            # Make Brian tree will fill in everything so passing in parameters to be filled
+            shortestPathsTree = make_brian_graph(client, pathsHome, spt_nodes, spt_edges, botLocations)
+
+            postorder_SPT = list(nx.dfs_postorder_nodes(shortestPathsTree, source=client.home))
+
+            #TODO: Make it so students update weights if they are wrong when remoting
+            #TODO: CHANGE IT SO IT DOESN'T JUST FINISH UP THE GRAPH
+            # remote bots home
+            print("start remoting home")
+            v = 0
+            for v_e in range(v + 1, len(postorder_SPT)):
+                more_bots_found = 0
+                if (postorder_SPT[v], postorder_SPT[v_e]) in shortestPathsTree.edges():
+                    more_bots_found = -client.bot_count[postorder_SPT[v]] + client.remote(postorder_SPT[v],postorder_SPT[v_e]) #client.bot_count must come first because it would change!
+                    total_bots_found += more_bots_found
+                for student in studentTruths:
+                    # Wow this is gross but it's because the first student is 0 indexed etc.
+                    if studentOpinions.get(node) == None: #Maybe this is home and somehow it fell through the cracks.
+                        break
+                    if (more_bots_found == 1 and studentOpinions.get(postorder_SPT[v])[student]) or (more_bots_found == 0 and not studentOpinions.get(postorder_SPT[v])[student]):
+                        studentTruths.update({student: studentTruths.get(student) + 1})
+                    elif (more_bots_found > 1):
+                        print("ERROR!!!!!")
+                        print("ERROR!!!!!")
+                        print("ERROR!!!!!")
+                        print("ERROR!!!!!")
+                        print("ERROR!!!!!")
+                    else:
+                        studentLies.update({student: studentLies.get(student) + 1})
+            print("done remoting home")
+
+
+
+
+def make_brian_graph(client, pathsHome, spt_nodes, spt_edges, botLocations):
+    for botNode in botLocations: # find path from each node to home, add to pathsHome
+        pathsHome[botNode] = (nx.dijkstra_path(client.G, botNode, client.home),
+        nx.dijkstra_path_length(client.G, botNode, client.home))
+
+    sorted_startNodes = sorted(pathsHome, key=lambda k: pathsHome[k][1]) # sort pathsHome by distance from each bot node to home
+
+    closestbotNode = sorted_startNodes[0] # bot node with shortest path to home
+
+    for node in pathsHome[closestbotNode][0]: # add into SPT all nodes from closestbotNode->home
+        spt_nodes.append(node)
+
+    for i in range(len(pathsHome[closestbotNode][0]) - 1): # add into SPT all edges from closestbotNode->home
+        spt_edges.append((pathsHome[closestbotNode][0][i], pathsHome[closestbotNode][0][i + 1]))
+
+    #print("spt_nodes initial:", spt_nodes)
+    #print("spt_edges initial:",spt_edges)
+
+    for i in range(1, len(sorted_startNodes)): # for each remaining bot node
+        startNode = sorted_startNodes[i]
+        pathsToSPT = {}
+
+        pathsToSPT[client.home] = (nx.dijkstra_path(client.G, startNode, client.home), nx.dijkstra_path_length(client.G, startNode, client.home))
+        for spt_node in spt_nodes: # compute (path, path length) from bot node to spt_node
+            pathsToSPT[spt_node] = (nx.dijkstra_path(client.G, startNode, spt_node), nx.dijkstra_path_length(client.G, startNode, spt_node))
+
+        sorted_pathsToSPT = sorted(pathsToSPT, key=lambda k: pathsToSPT[k][1])
+        #print("pathsToSPT:", pathsToSPT)
+        #print("sorted_pathsToSPT:", sorted_pathsToSPT)
+
+        closest_spt_node = sorted_pathsToSPT[0] # closest node in SPT
+
+        # add path to spt_nodes and spt_edges
+        pathToSPT = pathsToSPT[closest_spt_node][0]
+        for node in pathToSPT:
+            spt_nodes.append(node)
+        for i in range(len(pathToSPT) - 1):
+            spt_edges.append((pathToSPT[i], pathToSPT[i + 1]))
+
+        #print("spt_nodes:", spt_nodes)
+        #print("spt_edges:", spt_edges)
+
+    #build shortestPathsTree from spt_nodes and spt_edges
+    shortestPathsTree = nx.Graph()
+    for spt_node in spt_nodes:
+        shortestPathsTree.add_node(spt_node)
+    for spt_edge in spt_edges:
+        shortestPathsTree.add_edge(spt_edge[0], spt_edge[1])
+
+    return shortestPathsTree
 
 
 #NOTE: CHECK IF MY BOUNDS ARE CORRECT
 def update_student_weights(client, studentWeights, studentTruths, studentLies, student_truth_teller):
+    # If there is already a truth teller, no need to update
+    print(studentLies)
+    if student_truth_teller != None:
+        return
     for student in studentWeights:
         if (studentLies.get(student) >= client.v / 2):
             studentWeights.update({student: 10000}) #this man is the truth teller
             student_truth_teller = student
+            #If there is a truth teller than you should just listen to him.
+            for student in studentWeights:
+                if student != student_truth_teller:
+                    studentWeights.update({student: 0})
+            return
         #elif studentTruths.get(student) > client.vertices / 2:
         #    studentWeights.update({student: 0}) #Everything else this man says can be a truth or a lie, therefore we know he is not useful
         else:
             #Weights students in a way such that the more lies a student has told, the more trustworthy his opinion
-            studentWeights.update({student: 2.0 + 0.5 * studentLies.get(student) / (studentTruths.get(student) + studentLies.get(student))})
+            studentWeights.update({student: 1.0 + studentLies.get(student) / (client.v / 20 + studentTruths.get(student) + studentLies.get(student))})
 
 def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to_spt):
     total_hueristic = 0
@@ -358,8 +421,8 @@ def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to
         if studentOpinions.get(student):
             total_hueristic += studentWeights.get(student)
 
-    total_hueristic *= len(nodes_to_spt) * 0.25
-    total_hueristic /= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 100.0)
+    total_hueristic += len(nodes_to_spt) * 0.01 * client.students
+    total_hueristic -= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 200.0)
     return total_hueristic
 
 
@@ -384,6 +447,63 @@ def find_bots_scout(client):
                 vertex1 = pathHome[i]
                 vertex2 = pathHome[i + 1]
                 client.remote(vertex1, vertex2)
+
+def find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, studentOpinions, studentWeights):
+    best_node = None # We will choose the best node
+    neighbor_node = None # We will remote to this node, first node on way to SPT
+    best_hueristic_seen = float("-inf")# Keep track of the best hueristic value seen
+    #print(spt_nodes)
+
+    for node in client.G.nodes:
+        #You only want to remote using vertices outside of SPT
+        if node in spt_nodes or node in remoted_nodes_first_stage:
+            continue
+
+        #print(node)
+        # Find the shortest path to the SPT and the nodes along the path
+        shortest_path_to_spt = math.inf
+        best_path_nodes_to_spt = list()
+
+        for spt_node in spt_nodes:
+            distance_to_spt_node = nx.dijkstra_path_length(client.G, node, spt_node)
+            nodes_on_path_to_spt_node = nx.dijkstra_path(client.G, node, spt_node)
+            if (distance_to_spt_node <= shortest_path_to_spt):
+                # Only update the path if it is either shorter or if it is equal and contains more nodes
+                if (distance_to_spt_node < shortest_path_to_spt or len(nodes_on_path_to_spt_node) > len(best_path_nodes_to_spt)):
+                    shortest_path_to_spt = distance_to_spt_node
+                    best_path_nodes_to_spt = nodes_on_path_to_spt_node # List of nodes on the path
+
+        #Find the hueristic value for the current node
+        hueristic_for_node = find_hueristic_value(client, node, studentOpinions, studentWeights, best_path_nodes_to_spt)
+
+        # TO BE CHANGED -- Maybe we can improve this, right now am just only updating the best node if it has at least the same hueristic, not handling ties well
+        if hueristic_for_node >= best_hueristic_seen:
+            best_hueristic_seen = hueristic_for_node
+            best_node = node
+            neighbor_node = best_path_nodes_to_spt[1] #First node on the path
+    # After finding the best node and its neighbor to remote to, return them
+    return best_node, neighbor_node
+
+
+# Returns true if you should start remoting home along SPT, false otherwise
+def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, num_bots_remaining):
+    hueristic_contains_bot = list()
+    for node in client.G.nodes:
+        if node == client.home:
+            continue
+        total_hueristic_node = 0
+        for student in studentWeights:
+            if studentOpinions.get(node)[student]:
+                total_hueristic_node += studentWeights.get(student)
+        hueristic_contains_bot += [(node, total_hueristic_node)]
+    sorted(hueristic_contains_bot, key=lambda k: k[1])
+
+    for i in range(0, num_bots_remaining):
+        if hueristic_contains_bot[i][0] not in spt_nodes:
+            return False
+
+    return True
+
 
 
     """all_students = list(range(1, client.students + 1))
