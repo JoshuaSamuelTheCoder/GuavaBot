@@ -438,8 +438,10 @@ def find_bots_scout(client):
 
     all_students = list(range(1, client.students + 1))
 
-    if(len(all_students) > 20):
+    if(len(all_students) == 20):
     	all_students = list(range(1,client.students//2))
+    elif(len(all_students) == 20):
+    	all_students = list(range(1,client.students//4))
 
     scoreAtNode = {node: 0 for node in client.G.nodes}
     non_home = list(range(1, client.home)) + list(range(client.home + 1, client.v + 1))
