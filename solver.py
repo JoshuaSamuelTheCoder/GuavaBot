@@ -176,12 +176,12 @@ def run_naive_dijk(client):
 def ram_method(client):
     all_students = list(range(1, client.students + 1)) #A list of numbers indicating the students
     # Limit sampling to 30 students
-    #if (len(all_students) > 30):
-    #    all_students = random.choices(all_students, k=30)
+    if (len(all_students) > 15):
+        all_students = random.sample(all_students, k=15)
     studentWeights = {s: 1.0 for s in all_students} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
     studentTruths = {s: 0 for s in all_students} #How many truths a student has said after verifying with remote
     studentLies = {s: 0 for s in all_students} #How many lies a student has said after verifying with remote
-    studentOpinions = {node: [0] for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
+    studentOpinions = {node: {student:0 for student in all_students} for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
     student_truth_teller = None; # This is the student who we will always believe if we know he must be correct.
 
     seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
@@ -202,7 +202,8 @@ def ram_method(client):
         #Move all opinions to the studentOpinions dictionary
         for s in all_students:
             curr_opinions = studentOpinions.get(node)
-            studentOpinions.update({node: curr_opinions + [opinions_for_node.get(s)]}) #Add the student's opinion for the node
+            curr_opinions.update({s: opinions_for_node.get(s)})
+            studentOpinions.update({node: curr_opinions}) #Add the student's opinion for the node
 
     # There are two stages to this algorithm.
     # First: We must build up a SPT. We do this by remoting using vertices outside of our SPT. We prefer vertices that use a lot of edges to connect to our current SPT,
@@ -217,7 +218,7 @@ def ram_method(client):
     remoted_nodes_first_stage = set() # Set of remoted nodes
     shortestPathsTree = None
     #while(len(spt_nodes) + len(remoted_nodes_first_stage) < len(client.G.nodes)):
-    while (client.bots - total_bots_found > len(spt_nodes)):
+    while (client.bots - total_bots_found > len(spt_nodes) - 1):
         #if student_truth_teller != null:
         #   run_spt()
         best_node, neighbor_node = find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, studentOpinions, studentWeights)
@@ -236,7 +237,7 @@ def ram_method(client):
             if studentOpinions.get(best_node) == None:
                 break
             #print(student)
-            if (num_bots_remoted >= 1 and studentOpinions.get(best_node)[student]) or (num_bots_remoted == 0 and not studentOpinions.get(best_node)[student]):
+            if (num_bots_remoted >= 1 and studentOpinions.get(best_node).get(student)) or (num_bots_remoted == 0 and not studentOpinions.get(best_node).get(student)):
                 studentTruths.update({student: studentTruths.get(student) + 1})
             else:
                 studentLies.update({student: studentLies.get(student) + 1})
@@ -261,8 +262,9 @@ def ram_method(client):
     # postorder SPT to remote bots home
     # While you still have more bots to remote home keep remoting
     while (client.bot_count[client.home] < client.bots):
-        if (not should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, client.bots - total_bots_found)):
+        if (not should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, remoted_from_nodes, client.bots - total_bots_found) and not len(spt_nodes) + len(remoted_from_nodes) >= client.v):
             best_node, neighbor_node = find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, studentOpinions, studentWeights)
+            #print("LENGTH:", len(spt_nodes), len(remoted_from_nodes))
             # Get the number of bots remoted
             #print("Best Node", best_node, neighbor_node)
             num_bots_remoted = client.remote(best_node, neighbor_node)
@@ -276,7 +278,7 @@ def ram_method(client):
                 # Wow this is gross but it's because the first student is 0 indexed etc.
                 if studentOpinions.get(best_node) == None: #Maybe this is home and somehow it fell through the cracks.
                     break
-                if (num_bots_remoted == 1 and studentOpinions.get(best_node)[student]) or (num_bots_remoted == 0 and not studentOpinions.get(best_node)[student]):
+                if (num_bots_remoted == 1 and studentOpinions.get(best_node).get(student)) or (num_bots_remoted == 0 and not studentOpinions.get(best_node).get(student)):
                     studentTruths.update({student: studentTruths.get(student) + 1})
                 elif (num_bots_remoted > 1):
                     print("ERROR!!!!!")
@@ -325,9 +327,9 @@ def ram_method(client):
                     total_bots_found += more_bots_found
                 for student in studentTruths:
                     # Wow this is gross but it's because the first student is 0 indexed etc.
-                    if studentOpinions.get(node) == None: #Maybe this is home and somehow it fell through the cracks.
+                    if studentOpinions.get(postorder_SPT[v]) == None: #Maybe this is home and somehow it fell through the cracks.
                         break
-                    if (more_bots_found == 1 and studentOpinions.get(postorder_SPT[v])[student]) or (more_bots_found == 0 and not studentOpinions.get(postorder_SPT[v])[student]):
+                    if (more_bots_found == 1 and studentOpinions.get(postorder_SPT[v]).get(student)) or (more_bots_found == 0 and not studentOpinions.get(postorder_SPT[v]).get(student)):
                         studentTruths.update({student: studentTruths.get(student) + 1})
                     elif (more_bots_found > 1):
                         print("ERROR!!!!!")
@@ -397,7 +399,7 @@ def make_brian_graph(client, pathsHome, spt_nodes, spt_edges, botLocations):
 #NOTE: CHECK IF MY BOUNDS ARE CORRECT
 def update_student_weights(client, studentWeights, studentTruths, studentLies, student_truth_teller):
     # If there is already a truth teller, no need to update
-    print(studentLies)
+    #print(studentLies)
     if student_truth_teller != None:
         return
     for student in studentWeights:
@@ -413,16 +415,21 @@ def update_student_weights(client, studentWeights, studentTruths, studentLies, s
         #    studentWeights.update({student: 0}) #Everything else this man says can be a truth or a lie, therefore we know he is not useful
         else:
             #Weights students in a way such that the more lies a student has told, the more trustworthy his opinion
-            studentWeights.update({student: 1.0 + studentLies.get(student) / (client.v / 20 + studentTruths.get(student) + studentLies.get(student))})
+            #studentWeights.update({student: 1.0 + studentLies.get(student) / (client.v / 20 + studentTruths.get(student) + studentLies.get(student))})
+            #studentWeights.update({student: 1.0 + studentLies.get(student) / (client.v / 4.0)})
+            #studentWeights.update({student: 1.0})
+            studentWeights.update({student: 1.045 ** studentLies.get(student)}) #TO LOOK AT
+
 
 def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to_spt):
     total_hueristic = 0
     for student in studentWeights:
-        if studentOpinions.get(student):
-            total_hueristic += studentWeights.get(student)
+        if studentOpinions.get(node).get(student):
+            #if random.randint(1,101) >= 20: #TO LOOK AT
+            total_hueristic += studentWeights.get(student) #TO LOOK AT
 
-    total_hueristic += len(nodes_to_spt) * 0.01 * client.students
-    total_hueristic -= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') / 200.0)
+    total_hueristic += len(nodes_to_spt) * 0.01 * client.students #TO LOOK AT
+    #total_hueristic -= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') * len(studentWeights) / 4000.0) #TO LOOK AT
     return total_hueristic
 
 
@@ -486,7 +493,8 @@ def find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, st
 
 
 # Returns true if you should start remoting home along SPT, false otherwise
-def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, num_bots_remaining):
+def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, remoted_from_nodes, num_bots_remaining):
+    """
     hueristic_contains_bot = list()
     for node in client.G.nodes:
         if node == client.home:
@@ -498,13 +506,31 @@ def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, num_bo
         hueristic_contains_bot += [(node, total_hueristic_node)]
     sorted(hueristic_contains_bot, key=lambda k: k[1])
 
-    for i in range(0, num_bots_remaining):
+    for i in range(0, 1):
+    #for i in range(0, 1):
         if hueristic_contains_bot[i][0] not in spt_nodes:
             return False
 
     return True
+    """
 
+    if num_bots_remaining == 0:
+        return True
 
+    hueristic_spt = 0
+    hueristic_outside = 0
+    for node in client.G.nodes:
+        if node == client.home or node in remoted_from_nodes:
+            continue
+        total_hueristic_node = 0
+        for student in studentWeights:
+            #if random.randint(1,101) >= 40:
+            if studentOpinions.get(node).get(student):
+                if node in spt_nodes:
+                    hueristic_spt += studentWeights.get(student)
+                else:
+                    hueristic_outside += studentWeights.get(student)
+    return hueristic_spt > num_bots_remaining * 0.4 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
 
     """all_students = list(range(1, client.students + 1))
 
