@@ -16,8 +16,9 @@ def solve(client):
         run_naive_MST(client)
     else:
         find_bots_scout(client)
-    print(client.k)
     """
+
+    print(client.k)
 
 
     client.end()
@@ -176,8 +177,8 @@ def run_naive_dijk(client):
 def ram_method(client):
     all_students = list(range(1, client.students + 1)) #A list of numbers indicating the students
     # Limit sampling to 30 students
-    if (len(all_students) > 15):
-        all_students = random.sample(all_students, k=15)
+    if (len(all_students) > 20):
+        all_students = random.sample(all_students, k=20)
     studentWeights = {s: 1.0 for s in all_students} #How much to weight a student's opinion, 1 is default, 10000 is we know he is telling the truth, 0 is told truth V/2 many times.
     studentTruths = {s: 0 for s in all_students} #How many truths a student has said after verifying with remote
     studentLies = {s: 0 for s in all_students} #How many lies a student has said after verifying with remote
@@ -530,7 +531,7 @@ def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, remote
                     hueristic_spt += studentWeights.get(student)
                 else:
                     hueristic_outside += studentWeights.get(student)
-    return hueristic_spt > num_bots_remaining * 0.4 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
+    return hueristic_spt > num_bots_remaining * 0 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
 
     """all_students = list(range(1, client.students + 1))
 
