@@ -14,7 +14,8 @@ def solve(client):
     #find_bots_scout(client)
    
     if (client.k > 20):
-        ram_method(client)
+        #ram_method(client)
+        find_bots_scout(client)
     else:
         find_bots_scout(client)
     print(client.k)
