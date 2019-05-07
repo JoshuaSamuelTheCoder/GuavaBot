@@ -187,7 +187,7 @@ def ram_method(client):
     studentOpinions = {node: {student:0 for student in all_students} for node in client.G.nodes} #dictionary between (node, and a list of student opinions)
     student_truth_teller = None; # This is the student who we will always believe if we know he must be correct.
 
-    seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
+    #seenNodes = {node: False for node in client.G.nodes} # dictionary with (int node, boolean) pairs
     edge_list = []
     node_distance_to_home = {node: nx.dijkstra_path_length(client.G, node, client.home) for node in client.G.nodes} # Finds the distance of all nodes to home
     home_and_nodes_with_bots = [client.home] #These are all nodes that we would run dijkstra's to
@@ -236,12 +236,17 @@ def ram_method(client):
         #print(studentOpinions.get(best_node))
         #Update whether the student told the truth or not
         for student in studentTruths:
-            # Wow this is gross but it's because the first student is 0 indexed etc.
             if studentOpinions.get(best_node) == None:
                 break
             #print(student)
-            if (num_bots_remoted >= 1 and studentOpinions.get(best_node).get(student)) or (num_bots_remoted == 0 and not studentOpinions.get(best_node).get(student)):
+            if (num_bots_remoted == 1 and studentOpinions.get(best_node).get(student)) or (num_bots_remoted == 0 and not studentOpinions.get(best_node).get(student)):
                 studentTruths.update({student: studentTruths.get(student) + 1})
+            elif (num_bots_remoted > 1):
+                print("ERROR!!!!!")
+                print("ERROR!!!!!")
+                print("ERROR!!!!!")
+                print("ERROR!!!!!")
+                print("ERROR!!!!!")
             else:
                 studentLies.update({student: studentLies.get(student) + 1})
 
@@ -267,6 +272,8 @@ def ram_method(client):
     while (client.bot_count[client.home] < client.bots):
         if (not should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, remoted_from_nodes, client.bots - total_bots_found) and not len(spt_nodes) + len(remoted_from_nodes) >= client.v):
             best_node, neighbor_node = find_best_node_and_neighbor(client, spt_nodes, remoted_nodes_first_stage, studentOpinions, studentWeights)
+            #print(studentWeights)
+            #print(studentOpinions(best_node))
             #print("LENGTH:", len(spt_nodes), len(remoted_from_nodes))
             # Get the number of bots remoted
             #print("Best Node", best_node, neighbor_node)
@@ -422,6 +429,8 @@ def update_student_weights(client, studentWeights, studentTruths, studentLies, s
             #studentWeights.update({student: 1.0 + studentLies.get(student) / (client.v / 4.0)})
             #studentWeights.update({student: 1.0})
             studentWeights.update({student: 1.045 ** studentLies.get(student)}) #TO LOOK AT
+            #studentWeights.update({student: 1 + 0.2 * (studentLies.get(student))}) #TO LOOK AT
+            #studentWeights.update({student: (1 - 0.30348542587) ** studentTruths.get(student)})
 
 
 def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to_spt):
@@ -431,7 +440,7 @@ def find_hueristic_value(client, node, studentOpinions, studentWeights, nodes_to
             #if random.randint(1,101) >= 20: #TO LOOK AT
             total_hueristic += studentWeights.get(student) #TO LOOK AT
 
-    total_hueristic += len(nodes_to_spt) * 0.01 * client.students #TO LOOK AT
+    total_hueristic += len(nodes_to_spt) * 0.001 * client.students #TO LOOK AT
     #total_hueristic -= (client.G.get_edge_data(node, nodes_to_spt[1]).get('weight') * len(studentWeights) / 4000.0) #TO LOOK AT
     return total_hueristic
 
@@ -539,7 +548,11 @@ def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, remote
                     hueristic_spt += studentWeights.get(student)
                 else:
                     hueristic_outside += studentWeights.get(student)
+<<<<<<< HEAD
     return hueristic_spt > num_bots_remaining * 0 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
+=======
+    return hueristic_spt > num_bots_remaining * 0.55 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
+>>>>>>> bbbd31a52b770dc5af3976c5e9aad93c8ba65917
 
     """all_students = list(range(1, client.students + 1))
 

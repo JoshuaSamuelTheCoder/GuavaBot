@@ -11,11 +11,13 @@ scores10 = []
 scores20 = []
 scores40 = []
 for i in range(1, r + 1):
-    output = check_output(["python","client.py","--solver","solver"])
+    output = check_output(["python3","client.py","--solver","solver"])
+
+    print(output)
 
     a = output[220:229]
 
-   
+
     print(a)
     is_int = False
     try:
@@ -32,7 +34,7 @@ for i in range(1, r + 1):
             num_scouts = int(a[0:2])
         except ValueError:
             is_int = False
-    
+
     if(is_int == False):
         continue
     print(num_scouts)
@@ -60,8 +62,3 @@ if len(scores40) > 0:
     print("Average Score for 40 students " + str(avg40) + "\n")
 
 exit()
-
-
-
-
-  
