@@ -548,11 +548,7 @@ def should_remote_spt(client, studentOpinions, studentWeights, spt_nodes, remote
                     hueristic_spt += studentWeights.get(student)
                 else:
                     hueristic_outside += studentWeights.get(student)
-<<<<<<< HEAD
     return hueristic_spt > num_bots_remaining * 0 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
-=======
-    return hueristic_spt > num_bots_remaining * 0.55 * hueristic_outside / (client.v - len(remoted_from_nodes)) #TO LOOK AT
->>>>>>> bbbd31a52b770dc5af3976c5e9aad93c8ba65917
 
     """all_students = list(range(1, client.students + 1))
 

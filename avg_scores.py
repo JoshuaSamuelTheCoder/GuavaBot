@@ -13,9 +13,9 @@ scores40 = []
 for i in range(1, r + 1):
     output = check_output(["python3","client.py","--solver","solver"])
 
-    print(output)
+    #print(output)
 
-    a = output[220:229]
+    a = output[219:229]
 
 
     print(a)
